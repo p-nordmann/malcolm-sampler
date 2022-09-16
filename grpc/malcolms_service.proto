@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+// gRPC service definition.
+package grpc;
+option go_package = "github.com/p-nordmann/malcolm-sampler/grpc";
+
+service Appraiser {
+    // PutBoundaries registers boundaries that problems can be made of.
+    // It returns an UUID that will be required by the rpc RegisterTrueSamples.
+    rpc PutBoundaries(Boundaries) returns (UUID) {}
+
+    // RegisterTrueSamples registers posterior values sampled from the true posterior.
+    // The sampling problem starts recording when the first sample is streamed.
+    // It finishes when the stream is closed and an identification token is returned.
+    rpc RegisterTrueSamples(stream TrueSamples) returns (UUID) {}
+
+    // WalkFrom requests to perform one walk from a requested point for a requested number of steps.
+    //
+    // Returns the generated points.
+    rpc Walk(WalkRequest) returns (stream Samples) {}
+}
+
+message UUID {
+    string uuid = 1;
+}
+
+// Boundaries describes the bounding box of an inversion problem.
+// Infima are the lower bounds of the parameter space, while suprema are the higher bounds.
+message Boundaries {
+    int64 dimension = 1;
+    repeated double infima = 2;
+    repeated double suprema = 3;
+}
+
+// WalkRequest describes a starting point with a requested number of samples.
+// starting_point must be of correct dimension.
+message WalkRequest {
+    repeated double starting_point = 1;
+    int64 number_of_samples = 2;
+}
+
+// Samples represents a list of samples stored in a 1D array.
+// It can be used to store 1 or more data points consecutively.
+// Hence, the length of the array must be a multiple of the dimension.
+message Samples {
+    string uuid = 1;
+    repeated double coordinates = 2;
+}
+
+// TrueSamples represents a list of samples in a 1D array with posterior values.
+message TrueSamples {
+    string uuid = 1;
+    repeated double coordinates = 2;
+    repeated double posterior_values = 3;
+}
