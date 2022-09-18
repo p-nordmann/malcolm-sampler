@@ -11,7 +11,10 @@ type Boundaries struct {
 //
 // It provides all the necessary preprocessing and acts as a sampler factory.
 type TruePosterior interface {
-	NewSampler() Sampler
+	// NewSampler returns a Sampler ready to walk from `origin`.
+	//
+	// It expects `origin` to be of correct dimension.
+	NewSampler(origin []float64) Sampler
 }
 
 // Sampler is a thread-safe generator of samples.
@@ -19,5 +22,6 @@ type TruePosterior interface {
 // It refers to the TruePosterior that created it for the true posterior values and necessary
 // information.
 type Sampler interface {
+	// Sample walks and returns a new sample.
 	Sample() []float64
 }
