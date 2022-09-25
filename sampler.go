@@ -14,7 +14,7 @@ type TruePosterior interface {
 	// NewSampler returns a Sampler ready to walk from `origin`.
 	//
 	// It expects `origin` to be of correct dimension.
-	NewSampler(origin []float64) Sampler
+	NewSampler(origin []float64) (Sampler, error)
 }
 
 // Sampler is a thread-safe generator of samples.
