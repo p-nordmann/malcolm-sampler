@@ -391,7 +391,7 @@ func TestSamplingWithVariableDimensions(t *testing.T) {
 	}
 
 	const maxDimension = 4 // Limited by chi-squared quantile table; need to go up to 2^d-1.
-	const sampleCountRequest = 4000
+	const sampleCountRequest = 8000
 	var testCases []samplingTestCase
 
 	for dimension := 1; dimension <= maxDimension; dimension++ {
