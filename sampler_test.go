@@ -391,7 +391,7 @@ func TestSamplingWithVariableDimensions(t *testing.T) {
 	}
 
 	const maxDimension = 4 // Limited by chi-squared quantile table; need to go up to 2^d-1.
-	const sampleCountRequest = 8000
+	const sampleCountRequest = 10000
 	var testCases []samplingTestCase
 
 	for dimension := 1; dimension <= maxDimension; dimension++ {
@@ -415,7 +415,7 @@ func TestSamplingWithVariableDimensions(t *testing.T) {
 
 		// With 2^d true samples.
 		for k := range expectedPosterior {
-			expectedPosterior[k] = float64(k)
+			expectedPosterior[k] = float64(k + 1)
 		}
 		testCases = append(testCases, samplingTestCase{
 			description: "should sample according to staircase density",
@@ -432,6 +432,7 @@ func TestSamplingWithVariableDimensions(t *testing.T) {
 		})
 
 		// With 1 true sample.
+		expectedPosterior = make([]float64, len(samples))
 		for k := range expectedPosterior {
 			expectedPosterior[k] = 1 // uniform accross the cube.
 		}
