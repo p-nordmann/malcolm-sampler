@@ -7,6 +7,8 @@ import (
 	m "github.com/p-nordmann/malcolm-sampler"
 )
 
+// TODO(p-nordmann): small refactor to handle posterior normalization nicely.
+
 // Tests that the API behaves correctly with edgy inputs.
 //
 // In particular we test here that it returns error on creating  sampler factories.
@@ -337,8 +339,9 @@ func TestCreateCubeSamples(t *testing.T) {
 // TODO(p-nordmann): build the test the other way around; so that the fundamental hypothesis is
 // rejecting the distribution.
 func validateCubeDistribution(dimension int, samples [][]float64, posterior []float64) bool {
-	counts := make([]int, 1<<dimension)
+
 	// Count samples in each small cube.
+	counts := make([]int, 1<<dimension)
 	for _, sample := range samples {
 		var cubeIndex int
 		var mask int = 1
@@ -350,12 +353,23 @@ func validateCubeDistribution(dimension int, samples [][]float64, posterior []fl
 		}
 		counts[cubeIndex]++
 	}
+
+	// Normalize expected posterior.
+	var posteriorSum float64
+	for _, value := range posterior {
+		posteriorSum += value
+	}
+	normalizedPosterior := make([]float64, len(posterior))
+	for k := range posterior {
+		normalizedPosterior[k] = posterior[k] / posteriorSum
+	}
+
 	// Compare to expected distribution using chi-squared and table.
+	chi2 := chiSquared(counts, normalizedPosterior)
 	table5 := []float64{
 		3.84146, 5.99146, 7.81473, 9.48773, 11.07050, 12.59159, 14.06714, 15.50731, 16.91898,
 		18.30704, 19.67514, 21.02607, 22.36203, 23.68479, 24.99579, 26.29623,
 	}
-	chi2 := chiSquared(counts, posterior)
 	return chi2 < table5[(1<<dimension)-2]
 }
 
