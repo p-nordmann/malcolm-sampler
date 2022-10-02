@@ -7,6 +7,10 @@ type Boundaries struct {
 	Suprema, Infima []float64
 }
 
+func (boundaries Boundaries) dimension() int {
+	return len(boundaries.Infima)
+}
+
 // TruePosterior encapsulate the samples that have a true posterior value.
 //
 // It provides all the necessary preprocessing and acts as a sampler factory.
