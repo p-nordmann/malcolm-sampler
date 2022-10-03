@@ -14,14 +14,13 @@ func argSort(floats []float64) []int {
 	if len(floats) == 0 {
 		return nil
 	}
-	less := func(i, j int) bool {
-		return floats[i] < floats[j]
-	}
 	indices := make([]int, len(floats))
 	for k := range indices {
 		indices[k] = k
 	}
-	sort.SliceStable(indices, less)
+	sort.SliceStable(indices, func(i, j int) bool {
+		return floats[indices[i]] < floats[indices[j]]
+	})
 	return indices
 }
 
