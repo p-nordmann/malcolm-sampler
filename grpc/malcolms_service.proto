@@ -4,6 +4,8 @@ syntax = "proto3";
 package grpc;
 option go_package = "github.com/p-nordmann/malcolm-sampler/grpc";
 
+// TODO(p-nordmann): rename service and messages.
+
 service Appraiser {
     // PutBoundaries registers boundaries that problems can be made of.
     // It returns an UUID that will be required by the rpc RegisterTrueSamples.

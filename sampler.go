@@ -14,6 +14,8 @@ func (boundaries Boundaries) dimension() int {
 // TruePosterior encapsulate the samples that have a true posterior value.
 //
 // It provides all the necessary preprocessing and acts as a sampler factory.
+//
+// TODO(p-nordmann): change naming.
 type TruePosterior interface {
 	// NewSampler returns a Sampler ready to walk from `origin`.
 	//
