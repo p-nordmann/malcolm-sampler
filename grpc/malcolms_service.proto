@@ -37,6 +37,7 @@ message Boundaries {
 // WalkRequest describes a starting point with a requested number of samples.
 // starting_point must be of correct dimension.
 message WalkRequest {
+    string uuid = 3;
     repeated double starting_point = 1;
     int64 number_of_samples = 2;
 }
