@@ -16,8 +16,9 @@ The present readme file is not finished. Other paragraphs will be added later.
 
 ## Acknowledgement
 
-This work is based on work performed in 2019 during an internship at SINTEF. The original work came with the following
-acknowledgement:
+This work is based on code developed in 2019 during an internship at SINTEF.
+
+The original work came with the following acknowledgement:
 
 > This work has been produced with support from the SINTEF-coordinated Pre-ACT project
 > (Project No. 271497) funded by RCN (Norway), Gassnova (Norway), BEIS (UK), RVO (Netherlands), and BMWi (Germany) and
