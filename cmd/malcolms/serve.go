@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	ma "github.com/p-nordmann/malcolm-sampler"
 	pb "github.com/p-nordmann/malcolm-sampler/grpc"
 )
 
@@ -37,7 +38,15 @@ malcolms serve --port 1234`,
 		// Options can be specified in call to NewServer.
 		grpcServer := grpc.NewServer()
 
-		pb.RegisterAppraiserServer(grpcServer, &samplingServer{})
+		pb.RegisterAppraiserServer(
+			grpcServer,
+			&samplingServer{
+				state: store{
+					boundaries: make(map[string]ma.Boundaries),
+					factories:  make(map[string]ma.TruePosterior),
+				},
+			},
+		)
 		grpcServer.Serve(listener)
 	},
 }
