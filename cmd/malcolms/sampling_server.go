@@ -114,7 +114,7 @@ func (s *samplingServer) RegisterTrueSamples(sampleStream pb.Appraiser_RegisterT
 
 		// Validate boundaries and concatenate.
 		for k := range posterior {
-			point := coordinates[k : k+dimension]
+			point := coordinates[k*dimension : (k+1)*dimension]
 			// Validate that samples are not out of bounds.
 			for i := range point {
 				if point[i] < boundaries.Infima[i] || boundaries.Suprema[i] < point[i] {
