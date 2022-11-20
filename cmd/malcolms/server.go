@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 
-	m "github.com/p-nordmann/malcolm-sampler"
 	ma "github.com/p-nordmann/malcolm-sampler"
 	pb "github.com/p-nordmann/malcolm-sampler/grpc"
 )
@@ -17,8 +16,8 @@ import (
 // TODO(p-nordmann): thread safety.
 
 type store struct {
-	boundaries map[string]m.Boundaries
-	factories  map[string]m.SamplerFactory
+	boundaries map[string]ma.Boundaries
+	factories  map[string]ma.SamplerFactory
 }
 
 type samplingServer struct {
@@ -52,7 +51,7 @@ func (s *samplingServer) AddBoundaries(ctx context.Context, boundariesMessage *p
 	}
 	// Build and store boundaries.
 	UUID := uuid.New().String()
-	s.state.boundaries[UUID] = m.Boundaries{
+	s.state.boundaries[UUID] = ma.Boundaries{
 		Infima:  boundariesMessage.Infima,
 		Suprema: boundariesMessage.Suprema,
 	}
@@ -62,7 +61,7 @@ func (s *samplingServer) AddBoundaries(ctx context.Context, boundariesMessage *p
 func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosteriorServer) error {
 
 	var UUID string
-	var boundaries m.Boundaries
+	var boundaries ma.Boundaries
 	var samples [][]float64
 	var posteriorValues []float64
 
@@ -79,7 +78,7 @@ func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosterio
 				return errors.New("no data provided")
 			}
 			factoryUUID := uuid.New().String()
-			factory, err := m.FromSamples(boundaries, samples, posteriorValues)
+			factory, err := ma.FromSamples(boundaries, samples, posteriorValues)
 			if err != nil {
 				return fmt.Errorf("error creating factory: %w", err)
 			}
