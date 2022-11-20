@@ -17,7 +17,7 @@ import (
 // TODO(p-nordmann): thread safety.
 type store struct {
 	boundaries map[string]m.Boundaries
-	factories  map[string]m.TruePosterior
+	factories  map[string]m.SamplerFactory
 }
 
 type samplingServer struct {

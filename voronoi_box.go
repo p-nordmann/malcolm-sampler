@@ -10,7 +10,7 @@ import (
 // Dimensions are expected to be consistent between all parameters.
 func FromSamples(
 	boundaries Boundaries, samples [][]float64, posteriorValues []float64,
-) (TruePosterior, error) {
+) (SamplerFactory, error) {
 	dimension := boundaries.dimension()
 
 	// Validate boundaries.

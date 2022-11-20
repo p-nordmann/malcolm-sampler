@@ -43,7 +43,7 @@ malcolms serve --port 1234`,
 			&samplingServer{
 				state: store{
 					boundaries: make(map[string]ma.Boundaries),
-					factories:  make(map[string]ma.TruePosterior),
+					factories:  make(map[string]ma.SamplerFactory),
 				},
 			},
 		)
