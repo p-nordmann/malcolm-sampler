@@ -23,8 +23,7 @@ type SamplerFactory interface {
 
 // Sampler is a thread-safe generator of samples.
 //
-// It refers to the TruePosterior that created it for the true posterior values and necessary
-// information.
+// It refers to its parent factory to get the data it needs for sampling.
 type Sampler interface {
 	// Sample walks and returns a new sample.
 	Sample() []float64
