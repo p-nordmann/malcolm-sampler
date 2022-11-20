@@ -18,80 +18,88 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// AppraiserClient is the client API for Appraiser service.
+// MalcolmSamplerClient is the client API for MalcolmSampler service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AppraiserClient interface {
-	// PutBoundaries registers boundaries that problems can be made of.
-	// It returns an UUID that will be required by the rpc RegisterTrueSamples.
-	PutBoundaries(ctx context.Context, in *Boundaries, opts ...grpc.CallOption) (*UUID, error)
-	// RegisterTrueSamples registers posterior values sampled from the true posterior.
+type MalcolmSamplerClient interface {
+	// AddBoundaries registers boundaries of a parameter space.
+	//
+	// It returns the UUID to refer to these boundaries.
+	AddBoundaries(ctx context.Context, in *Boundaries, opts ...grpc.CallOption) (*BoundariesUUID, error)
+	// AddPosterior registers posterior values sampled from the true posterior.
+	//
 	// The sampling problem starts recording when the first sample is streamed.
 	// It finishes when the stream is closed and an identification token is returned.
-	RegisterTrueSamples(ctx context.Context, opts ...grpc.CallOption) (Appraiser_RegisterTrueSamplesClient, error)
-	// WalkFrom requests to perform one walk from a requested point for a requested number of steps.
 	//
-	// Returns the generated points.
-	Walk(ctx context.Context, in *WalkRequest, opts ...grpc.CallOption) (Appraiser_WalkClient, error)
+	// This rpc expects samples in batches.
+	//
+	// Whether it accepts a fraction of a point in a batch is implementation-specific.
+	AddPosterior(ctx context.Context, opts ...grpc.CallOption) (MalcolmSampler_AddPosteriorClient, error)
+	// MakeSamples samples the requested number of points.
+	//
+	// Streams the generated points.
+	//
+	// Whether samples are batched in responses is implementation-specific.
+	MakeSamples(ctx context.Context, in *MakeSamplesRequest, opts ...grpc.CallOption) (MalcolmSampler_MakeSamplesClient, error)
 }
 
-type appraiserClient struct {
+type malcolmSamplerClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAppraiserClient(cc grpc.ClientConnInterface) AppraiserClient {
-	return &appraiserClient{cc}
+func NewMalcolmSamplerClient(cc grpc.ClientConnInterface) MalcolmSamplerClient {
+	return &malcolmSamplerClient{cc}
 }
 
-func (c *appraiserClient) PutBoundaries(ctx context.Context, in *Boundaries, opts ...grpc.CallOption) (*UUID, error) {
-	out := new(UUID)
-	err := c.cc.Invoke(ctx, "/grpc.Appraiser/PutBoundaries", in, out, opts...)
+func (c *malcolmSamplerClient) AddBoundaries(ctx context.Context, in *Boundaries, opts ...grpc.CallOption) (*BoundariesUUID, error) {
+	out := new(BoundariesUUID)
+	err := c.cc.Invoke(ctx, "/grpc.MalcolmSampler/AddBoundaries", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *appraiserClient) RegisterTrueSamples(ctx context.Context, opts ...grpc.CallOption) (Appraiser_RegisterTrueSamplesClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Appraiser_ServiceDesc.Streams[0], "/grpc.Appraiser/RegisterTrueSamples", opts...)
+func (c *malcolmSamplerClient) AddPosterior(ctx context.Context, opts ...grpc.CallOption) (MalcolmSampler_AddPosteriorClient, error) {
+	stream, err := c.cc.NewStream(ctx, &MalcolmSampler_ServiceDesc.Streams[0], "/grpc.MalcolmSampler/AddPosterior", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &appraiserRegisterTrueSamplesClient{stream}
+	x := &malcolmSamplerAddPosteriorClient{stream}
 	return x, nil
 }
 
-type Appraiser_RegisterTrueSamplesClient interface {
-	Send(*TrueSamples) error
-	CloseAndRecv() (*UUID, error)
+type MalcolmSampler_AddPosteriorClient interface {
+	Send(*PosteriorValuesBatch) error
+	CloseAndRecv() (*PosteriorUUID, error)
 	grpc.ClientStream
 }
 
-type appraiserRegisterTrueSamplesClient struct {
+type malcolmSamplerAddPosteriorClient struct {
 	grpc.ClientStream
 }
 
-func (x *appraiserRegisterTrueSamplesClient) Send(m *TrueSamples) error {
+func (x *malcolmSamplerAddPosteriorClient) Send(m *PosteriorValuesBatch) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *appraiserRegisterTrueSamplesClient) CloseAndRecv() (*UUID, error) {
+func (x *malcolmSamplerAddPosteriorClient) CloseAndRecv() (*PosteriorUUID, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(UUID)
+	m := new(PosteriorUUID)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *appraiserClient) Walk(ctx context.Context, in *WalkRequest, opts ...grpc.CallOption) (Appraiser_WalkClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Appraiser_ServiceDesc.Streams[1], "/grpc.Appraiser/Walk", opts...)
+func (c *malcolmSamplerClient) MakeSamples(ctx context.Context, in *MakeSamplesRequest, opts ...grpc.CallOption) (MalcolmSampler_MakeSamplesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &MalcolmSampler_ServiceDesc.Streams[1], "/grpc.MalcolmSampler/MakeSamples", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &appraiserWalkClient{stream}
+	x := &malcolmSamplerMakeSamplesClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -101,153 +109,161 @@ func (c *appraiserClient) Walk(ctx context.Context, in *WalkRequest, opts ...grp
 	return x, nil
 }
 
-type Appraiser_WalkClient interface {
-	Recv() (*Samples, error)
+type MalcolmSampler_MakeSamplesClient interface {
+	Recv() (*SamplesBatch, error)
 	grpc.ClientStream
 }
 
-type appraiserWalkClient struct {
+type malcolmSamplerMakeSamplesClient struct {
 	grpc.ClientStream
 }
 
-func (x *appraiserWalkClient) Recv() (*Samples, error) {
-	m := new(Samples)
+func (x *malcolmSamplerMakeSamplesClient) Recv() (*SamplesBatch, error) {
+	m := new(SamplesBatch)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-// AppraiserServer is the server API for Appraiser service.
-// All implementations must embed UnimplementedAppraiserServer
+// MalcolmSamplerServer is the server API for MalcolmSampler service.
+// All implementations must embed UnimplementedMalcolmSamplerServer
 // for forward compatibility
-type AppraiserServer interface {
-	// PutBoundaries registers boundaries that problems can be made of.
-	// It returns an UUID that will be required by the rpc RegisterTrueSamples.
-	PutBoundaries(context.Context, *Boundaries) (*UUID, error)
-	// RegisterTrueSamples registers posterior values sampled from the true posterior.
+type MalcolmSamplerServer interface {
+	// AddBoundaries registers boundaries of a parameter space.
+	//
+	// It returns the UUID to refer to these boundaries.
+	AddBoundaries(context.Context, *Boundaries) (*BoundariesUUID, error)
+	// AddPosterior registers posterior values sampled from the true posterior.
+	//
 	// The sampling problem starts recording when the first sample is streamed.
 	// It finishes when the stream is closed and an identification token is returned.
-	RegisterTrueSamples(Appraiser_RegisterTrueSamplesServer) error
-	// WalkFrom requests to perform one walk from a requested point for a requested number of steps.
 	//
-	// Returns the generated points.
-	Walk(*WalkRequest, Appraiser_WalkServer) error
-	mustEmbedUnimplementedAppraiserServer()
+	// This rpc expects samples in batches.
+	//
+	// Whether it accepts a fraction of a point in a batch is implementation-specific.
+	AddPosterior(MalcolmSampler_AddPosteriorServer) error
+	// MakeSamples samples the requested number of points.
+	//
+	// Streams the generated points.
+	//
+	// Whether samples are batched in responses is implementation-specific.
+	MakeSamples(*MakeSamplesRequest, MalcolmSampler_MakeSamplesServer) error
+	mustEmbedUnimplementedMalcolmSamplerServer()
 }
 
-// UnimplementedAppraiserServer must be embedded to have forward compatible implementations.
-type UnimplementedAppraiserServer struct {
+// UnimplementedMalcolmSamplerServer must be embedded to have forward compatible implementations.
+type UnimplementedMalcolmSamplerServer struct {
 }
 
-func (UnimplementedAppraiserServer) PutBoundaries(context.Context, *Boundaries) (*UUID, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PutBoundaries not implemented")
+func (UnimplementedMalcolmSamplerServer) AddBoundaries(context.Context, *Boundaries) (*BoundariesUUID, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddBoundaries not implemented")
 }
-func (UnimplementedAppraiserServer) RegisterTrueSamples(Appraiser_RegisterTrueSamplesServer) error {
-	return status.Errorf(codes.Unimplemented, "method RegisterTrueSamples not implemented")
+func (UnimplementedMalcolmSamplerServer) AddPosterior(MalcolmSampler_AddPosteriorServer) error {
+	return status.Errorf(codes.Unimplemented, "method AddPosterior not implemented")
 }
-func (UnimplementedAppraiserServer) Walk(*WalkRequest, Appraiser_WalkServer) error {
-	return status.Errorf(codes.Unimplemented, "method Walk not implemented")
+func (UnimplementedMalcolmSamplerServer) MakeSamples(*MakeSamplesRequest, MalcolmSampler_MakeSamplesServer) error {
+	return status.Errorf(codes.Unimplemented, "method MakeSamples not implemented")
 }
-func (UnimplementedAppraiserServer) mustEmbedUnimplementedAppraiserServer() {}
+func (UnimplementedMalcolmSamplerServer) mustEmbedUnimplementedMalcolmSamplerServer() {}
 
-// UnsafeAppraiserServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AppraiserServer will
+// UnsafeMalcolmSamplerServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to MalcolmSamplerServer will
 // result in compilation errors.
-type UnsafeAppraiserServer interface {
-	mustEmbedUnimplementedAppraiserServer()
+type UnsafeMalcolmSamplerServer interface {
+	mustEmbedUnimplementedMalcolmSamplerServer()
 }
 
-func RegisterAppraiserServer(s grpc.ServiceRegistrar, srv AppraiserServer) {
-	s.RegisterService(&Appraiser_ServiceDesc, srv)
+func RegisterMalcolmSamplerServer(s grpc.ServiceRegistrar, srv MalcolmSamplerServer) {
+	s.RegisterService(&MalcolmSampler_ServiceDesc, srv)
 }
 
-func _Appraiser_PutBoundaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _MalcolmSampler_AddBoundaries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Boundaries)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AppraiserServer).PutBoundaries(ctx, in)
+		return srv.(MalcolmSamplerServer).AddBoundaries(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/grpc.Appraiser/PutBoundaries",
+		FullMethod: "/grpc.MalcolmSampler/AddBoundaries",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AppraiserServer).PutBoundaries(ctx, req.(*Boundaries))
+		return srv.(MalcolmSamplerServer).AddBoundaries(ctx, req.(*Boundaries))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Appraiser_RegisterTrueSamples_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(AppraiserServer).RegisterTrueSamples(&appraiserRegisterTrueSamplesServer{stream})
+func _MalcolmSampler_AddPosterior_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MalcolmSamplerServer).AddPosterior(&malcolmSamplerAddPosteriorServer{stream})
 }
 
-type Appraiser_RegisterTrueSamplesServer interface {
-	SendAndClose(*UUID) error
-	Recv() (*TrueSamples, error)
+type MalcolmSampler_AddPosteriorServer interface {
+	SendAndClose(*PosteriorUUID) error
+	Recv() (*PosteriorValuesBatch, error)
 	grpc.ServerStream
 }
 
-type appraiserRegisterTrueSamplesServer struct {
+type malcolmSamplerAddPosteriorServer struct {
 	grpc.ServerStream
 }
 
-func (x *appraiserRegisterTrueSamplesServer) SendAndClose(m *UUID) error {
+func (x *malcolmSamplerAddPosteriorServer) SendAndClose(m *PosteriorUUID) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *appraiserRegisterTrueSamplesServer) Recv() (*TrueSamples, error) {
-	m := new(TrueSamples)
+func (x *malcolmSamplerAddPosteriorServer) Recv() (*PosteriorValuesBatch, error) {
+	m := new(PosteriorValuesBatch)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func _Appraiser_Walk_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(WalkRequest)
+func _MalcolmSampler_MakeSamples_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(MakeSamplesRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(AppraiserServer).Walk(m, &appraiserWalkServer{stream})
+	return srv.(MalcolmSamplerServer).MakeSamples(m, &malcolmSamplerMakeSamplesServer{stream})
 }
 
-type Appraiser_WalkServer interface {
-	Send(*Samples) error
+type MalcolmSampler_MakeSamplesServer interface {
+	Send(*SamplesBatch) error
 	grpc.ServerStream
 }
 
-type appraiserWalkServer struct {
+type malcolmSamplerMakeSamplesServer struct {
 	grpc.ServerStream
 }
 
-func (x *appraiserWalkServer) Send(m *Samples) error {
+func (x *malcolmSamplerMakeSamplesServer) Send(m *SamplesBatch) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-// Appraiser_ServiceDesc is the grpc.ServiceDesc for Appraiser service.
+// MalcolmSampler_ServiceDesc is the grpc.ServiceDesc for MalcolmSampler service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Appraiser_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "grpc.Appraiser",
-	HandlerType: (*AppraiserServer)(nil),
+var MalcolmSampler_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "grpc.MalcolmSampler",
+	HandlerType: (*MalcolmSamplerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "PutBoundaries",
-			Handler:    _Appraiser_PutBoundaries_Handler,
+			MethodName: "AddBoundaries",
+			Handler:    _MalcolmSampler_AddBoundaries_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "RegisterTrueSamples",
-			Handler:       _Appraiser_RegisterTrueSamples_Handler,
+			StreamName:    "AddPosterior",
+			Handler:       _MalcolmSampler_AddPosterior_Handler,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "Walk",
-			Handler:       _Appraiser_Walk_Handler,
+			StreamName:    "MakeSamples",
+			Handler:       _MalcolmSampler_MakeSamples_Handler,
 			ServerStreams: true,
 		},
 	},

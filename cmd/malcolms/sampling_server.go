@@ -21,12 +21,12 @@ type store struct {
 }
 
 type samplingServer struct {
-	pb.UnimplementedAppraiserServer
+	pb.UnimplementedMalcolmSamplerServer
 
 	state store
 }
 
-func (s *samplingServer) PutBoundaries(ctx context.Context, boundariesMessage *pb.Boundaries) (*pb.UUID, error) {
+func (s *samplingServer) PutBoundaries(ctx context.Context, boundariesMessage *pb.Boundaries) (*pb.BoundariesUUID, error) {
 	// Validate message.
 	dimension := int(boundariesMessage.Dimension)
 	if boundariesMessage.Dimension < 1 {
@@ -46,10 +46,10 @@ func (s *samplingServer) PutBoundaries(ctx context.Context, boundariesMessage *p
 		Infima:  boundariesMessage.Infima,
 		Suprema: boundariesMessage.Suprema,
 	}
-	return &pb.UUID{Uuid: UUID}, nil
+	return &pb.BoundariesUUID{Value: UUID}, nil
 }
 
-func (s *samplingServer) RegisterTrueSamples(sampleStream pb.Appraiser_RegisterTrueSamplesServer) error {
+func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosteriorServer) error {
 
 	var UUID string
 	var boundaries m.Boundaries
@@ -74,14 +74,14 @@ func (s *samplingServer) RegisterTrueSamples(sampleStream pb.Appraiser_RegisterT
 				return fmt.Errorf("error creating factory: %w", err)
 			}
 			s.state.factories[factoryUUID] = factory
-			return sampleStream.SendAndClose(&pb.UUID{Uuid: factoryUUID})
+			return sampleStream.SendAndClose(&pb.PosteriorUUID{Value: factoryUUID})
 		}
 
 		// Process error cases.
 		if err != nil {
 			return fmt.Errorf("error receiving true samples: %w", err)
 		}
-		msgUUID := msg.GetUuid()
+		msgUUID := msg.GetUuid().GetValue()
 		if len(msgUUID) == 0 {
 			return errors.New("empty UUID is not allowed")
 		}
@@ -127,19 +127,19 @@ func (s *samplingServer) RegisterTrueSamples(sampleStream pb.Appraiser_RegisterT
 	}
 }
 
-func (s *samplingServer) Walk(msg *pb.WalkRequest, sampleStream pb.Appraiser_WalkServer) error {
-	UUID := msg.GetUuid()
-	numberOfSamples := int(msg.GetNumberOfSamples())
+func (s *samplingServer) Walk(msg *pb.MakeSamplesRequest, sampleStream pb.MalcolmSampler_MakeSamplesServer) error {
+	UUID := msg.GetUuid().GetValue()
+	numberOfSamples := int(msg.GetAmount())
 	if numberOfSamples <= 0 {
 		return errors.New("number_of_samples must be positive")
 	}
 	if factory, ok := s.state.factories[UUID]; ok {
-		sampler, err := factory.NewSampler(msg.GetStartingPoint())
+		sampler, err := factory.NewSampler(msg.GetOrigin())
 		if err != nil {
 			return fmt.Errorf("error building sampler: %w", err)
 		}
 		for k := 0; k < numberOfSamples; k++ {
-			sampleStream.Send(&pb.Samples{Uuid: UUID, Coordinates: sampler.Sample()})
+			sampleStream.Send(&pb.SamplesBatch{Coordinates: sampler.Sample()})
 		}
 		return nil
 	}

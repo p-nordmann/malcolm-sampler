@@ -38,7 +38,7 @@ malcolms serve --port 1234`,
 		// Options can be specified in call to NewServer.
 		grpcServer := grpc.NewServer()
 
-		pb.RegisterAppraiserServer(
+		pb.RegisterMalcolmSamplerServer(
 			grpcServer,
 			&samplingServer{
 				state: store{
