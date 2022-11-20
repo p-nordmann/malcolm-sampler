@@ -4,29 +4,41 @@ syntax = "proto3";
 package grpc;
 option go_package = "github.com/p-nordmann/malcolm-sampler/grpc";
 
-// TODO(p-nordmann): rename service and messages.
 
-service Appraiser {
-    // PutBoundaries registers boundaries that problems can be made of.
-    // It returns an UUID that will be required by the rpc RegisterTrueSamples.
-    rpc PutBoundaries(Boundaries) returns (UUID) {}
+service MalcolmSampler {
+    // AddBoundaries registers boundaries of a parameter space.
+    //
+    // It returns the UUID to refer to these boundaries.
+    rpc AddBoundaries(Boundaries) returns (BoundariesUUID) {}
 
-    // RegisterTrueSamples registers posterior values sampled from the true posterior.
+    // AddPosterior registers posterior values sampled from the true posterior.
+    //
     // The sampling problem starts recording when the first sample is streamed.
     // It finishes when the stream is closed and an identification token is returned.
-    rpc RegisterTrueSamples(stream TrueSamples) returns (UUID) {}
-
-    // WalkFrom requests to perform one walk from a requested point for a requested number of steps.
     //
-    // Returns the generated points.
-    rpc Walk(WalkRequest) returns (stream Samples) {}
+    // This rpc expects samples in batches.
+    //
+    // Whether it accepts a fraction of a point in a batch is implementation-specific.
+    rpc AddPosterior(stream PosteriorValuesBatch) returns (PosteriorUUID) {}
+
+    // MakeSamples samples the requested number of points.
+    //
+    // Streams the generated points.
+    //
+    // Whether samples are batched in responses is implementation-specific.
+    rpc MakeSamples(MakeSamplesRequest) returns (stream SamplesBatch) {}
 }
 
-message UUID {
-    string uuid = 1;
+message BoundariesUUID {
+    string value = 1;
+}
+
+message PosteriorUUID {
+    string value = 1;
 }
 
 // Boundaries describes the bounding box of an inversion problem.
+//
 // Infima are the lower bounds of the parameter space, while suprema are the higher bounds.
 message Boundaries {
     int64 dimension = 1;
@@ -34,25 +46,31 @@ message Boundaries {
     repeated double suprema = 3;
 }
 
-// WalkRequest describes a starting point with a requested number of samples.
-// starting_point must be of correct dimension.
-message WalkRequest {
-    string uuid = 3;
-    repeated double starting_point = 1;
-    int64 number_of_samples = 2;
-}
-
-// Samples represents a list of samples stored in a 1D array.
-// It can be used to store 1 or more data points consecutively.
-// Hence, the length of the array must be a multiple of the dimension.
-message Samples {
-    string uuid = 1;
-    repeated double coordinates = 2;
-}
-
-// TrueSamples represents a list of samples in a 1D array with posterior values.
-message TrueSamples {
-    string uuid = 1;
+// PosteriorValuesBatch represents a batch of samples with posterior values.
+//
+// It expects column-major order for coordinates.
+message PosteriorValuesBatch {
+    BoundariesUUID uuid = 1;
     repeated double coordinates = 2;
     repeated double posterior_values = 3;
 }
+
+// MakeSamplesRequest represents a request to generate samples.
+//
+// The underlying algorithm is a random walk (MCMC).
+// `origin` is the point where the walk starts from and `amount` is the number of samples to generate.
+message MakeSamplesRequest {
+    PosteriorUUID uuid = 1;
+    repeated double origin = 2;
+    int64 amount = 3;
+}
+
+// SamplesBatch represents a batch of generated samples.
+//
+// It stores coordinates in row-major order.
+//
+// Whether it holds more than 1 point is implementation-specific.
+message SamplesBatch {
+    repeated double coordinates = 1;
+}
+
