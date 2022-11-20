@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
-	ma "github.com/p-nordmann/malcolm-sampler"
 	pb "github.com/p-nordmann/malcolm-sampler/grpc"
 )
 
@@ -40,12 +39,7 @@ malcolms serve --port 1234`,
 
 		pb.RegisterMalcolmSamplerServer(
 			grpcServer,
-			&samplingServer{
-				state: store{
-					boundaries: make(map[string]ma.Boundaries),
-					factories:  make(map[string]ma.SamplerFactory),
-				},
-			},
+			NewServer(),
 		)
 		grpcServer.Serve(listener)
 	},

@@ -9,12 +9,13 @@ import (
 	"github.com/google/uuid"
 
 	m "github.com/p-nordmann/malcolm-sampler"
+	ma "github.com/p-nordmann/malcolm-sampler"
 	pb "github.com/p-nordmann/malcolm-sampler/grpc"
 )
 
 // TODO(p-nordmann): do not embed internal errors in grpc responses.
-
 // TODO(p-nordmann): thread safety.
+
 type store struct {
 	boundaries map[string]m.Boundaries
 	factories  map[string]m.SamplerFactory
@@ -26,7 +27,16 @@ type samplingServer struct {
 	state store
 }
 
-func (s *samplingServer) PutBoundaries(ctx context.Context, boundariesMessage *pb.Boundaries) (*pb.BoundariesUUID, error) {
+func NewServer() *samplingServer {
+	return &samplingServer{
+		state: store{
+			boundaries: make(map[string]ma.Boundaries),
+			factories:  make(map[string]ma.SamplerFactory),
+		},
+	}
+}
+
+func (s *samplingServer) AddBoundaries(ctx context.Context, boundariesMessage *pb.Boundaries) (*pb.BoundariesUUID, error) {
 	// Validate message.
 	dimension := int(boundariesMessage.Dimension)
 	if boundariesMessage.Dimension < 1 {
@@ -127,7 +137,7 @@ func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosterio
 	}
 }
 
-func (s *samplingServer) Walk(msg *pb.MakeSamplesRequest, sampleStream pb.MalcolmSampler_MakeSamplesServer) error {
+func (s *samplingServer) MakeSamples(msg *pb.MakeSamplesRequest, sampleStream pb.MalcolmSampler_MakeSamplesServer) error {
 	UUID := msg.GetUuid().GetValue()
 	numberOfSamples := int(msg.GetAmount())
 	if numberOfSamples <= 0 {
