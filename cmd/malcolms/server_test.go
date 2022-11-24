@@ -2,110 +2,12 @@ package main_test
 
 import (
 	"context"
-	"io"
 	"testing"
 
 	m "github.com/p-nordmann/malcolm-sampler"
 	malcolms "github.com/p-nordmann/malcolm-sampler/cmd/malcolms"
 	mgrpc "github.com/p-nordmann/malcolm-sampler/grpc"
-	"google.golang.org/grpc"
 )
-
-// mockAddPosteriorStream provides mocking for request's stream for AddPosterior.
-type mockAddPosteriorStream struct {
-	next   chan *mgrpc.PosteriorValuesBatch
-	result chan *mgrpc.PosteriorUUID
-	grpc.ServerStream
-}
-
-func makeMockAddPosteriorStream() *mockAddPosteriorStream {
-	return &mockAddPosteriorStream{
-		next:   make(chan *mgrpc.PosteriorValuesBatch),
-		result: make(chan *mgrpc.PosteriorUUID),
-	}
-}
-
-func (s *mockAddPosteriorStream) SendAndClose(uuid *mgrpc.PosteriorUUID) error {
-	s.result <- uuid
-	close(s.result)
-	return nil
-}
-
-func (s *mockAddPosteriorStream) Recv() (*mgrpc.PosteriorValuesBatch, error) {
-	next, ok := <-s.next
-	if !ok {
-		return nil, io.EOF
-	}
-	return next, nil
-}
-
-// mockSamplesStream provides mocking for response's stream for MakeSamples.
-//
-// TODO: add the possibility to stall on Send in order to synchronize parallel calls to MakeSamples.
-type mockSamplesStream struct {
-	dimension int
-	samples   [][]float64
-	grpc.ServerStream
-}
-
-func makeMockSamplesStream(dimension int) *mockSamplesStream {
-	return &mockSamplesStream{
-		dimension: dimension,
-	}
-}
-
-func (s *mockSamplesStream) Send(m *mgrpc.SamplesBatch) error {
-	for k := 0; k < len(m.Coordinates); k += s.dimension {
-		s.samples = append(s.samples, m.Coordinates[k:k+s.dimension])
-	}
-	return nil
-}
-
-// posterior describes a set of points with posterior values.
-type posterior struct {
-	coordinates     [][]float64
-	posteriorValues []float64
-}
-
-// flatPosterior represents the same information as posterior struct with flattened coordinates.
-type flatPosterior struct {
-	coordinates     []float64
-	posteriorValues []float64
-}
-
-// toRowMajor converts a posterior to flatPosterior by flattening coordinates in row-major order.
-func toRowMajor(p posterior) flatPosterior {
-	f := flatPosterior{
-		posteriorValues: p.posteriorValues,
-	}
-	if len(p.coordinates) > 0 {
-		dimension := len(p.coordinates[0])
-		f.coordinates = make([]float64, len(p.coordinates)*dimension)
-		for k, point := range p.coordinates {
-			for i, coordinate := range point {
-				f.coordinates[k*dimension+i] = coordinate
-			}
-		}
-	}
-	return f
-}
-
-// toColumnMajor converts a posterior to flatPosterior by flattening coordinates in column-major order.
-func toColumnMajor(p posterior) flatPosterior {
-	f := flatPosterior{
-		posteriorValues: p.posteriorValues,
-	}
-	count := len(p.coordinates)
-	if count > 0 {
-		f.coordinates = make([]float64, count*len(p.coordinates[0]))
-		for k, point := range p.coordinates {
-			for i, coordinate := range point {
-				f.coordinates[i*count+k] = coordinate
-			}
-		}
-	}
-	return f
-}
 
 // server will be used by the tests.
 var server = malcolms.NewServer()
@@ -132,11 +34,9 @@ func sendBoundaries(b m.Boundaries) (string, error) {
 // sendPosterior builds a grpc stream and triggers AddPosterior.
 //
 // It returns the value of the UUID and the error returned by the server.
-//
-// TODO: handle error returned by AddPosterior.
 func sendPosterior(f flatPosterior, dimension, batchSize int, boundariesUUID string) (string, error) {
 	stream := makeMockAddPosteriorStream()
-	go server.AddPosterior(stream)
+	go func() { stream.err <- server.AddPosterior(stream) }()
 	for batchCount := 0; batchCount*batchSize < len(f.posteriorValues); batchCount++ {
 		stream.next <- &mgrpc.PosteriorValuesBatch{
 			Uuid:            &mgrpc.BoundariesUUID{Value: boundariesUUID},
@@ -145,7 +45,12 @@ func sendPosterior(f flatPosterior, dimension, batchSize int, boundariesUUID str
 		}
 	}
 	close(stream.next)
-	return (<-stream.result).Value, nil
+	select {
+	case err := <-stream.err:
+		return "", err
+	case result := <-stream.result:
+		return result.Value, nil
+	}
 }
 
 // The server should allow to add boundaries, posterior and make samples.
@@ -269,7 +174,24 @@ func TestUUIDAreUnique(t *testing.T) {
 // Basic failure cases should be gracefully handled and trigger nice errors from the server.
 func TestFailureCases(t *testing.T) {
 	t.Run("posterior should be expected in column-major order", func(t *testing.T) {
-
+		dimension := 3
+		exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}}
+		exampleFlatPosterior := toRowMajor(
+			posterior{
+				coordinates: [][]float64{
+					{0.5, 0.5, 2.5},
+					{0.5, 0.5, 2.5},
+					{0.5, 0.5, 2.5},
+					{0.5, 0.5, 2.5},
+				},
+				posteriorValues: []float64{1, 2, 3, 4},
+			},
+		)
+		boundariesUUID, _ := sendBoundaries(exampleBoundaries)
+		_, err := sendPosterior(exampleFlatPosterior, dimension, 4, boundariesUUID)
+		if err == nil {
+			t.Error("Expected error out of bounds but got <nil>.")
+		}
 	})
 	t.Run("should fail when providing wrong UUID to AddPosterior", func(t *testing.T) {
 
