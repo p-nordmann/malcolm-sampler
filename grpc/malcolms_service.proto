@@ -48,7 +48,7 @@ message Boundaries {
 
 // PosteriorValuesBatch represents a batch of samples with posterior values.
 //
-// It expects column-major order for coordinates.
+// It expects row-major order for coordinates.
 message PosteriorValuesBatch {
     BoundariesUUID uuid = 1;
     repeated double coordinates = 2;

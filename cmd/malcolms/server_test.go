@@ -65,7 +65,7 @@ func TestBasicUseCase(t *testing.T) {
 	exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}}
 
 	t.Run("should allow to register boundaries, posterior (batch_size=1) and make samples", func(t *testing.T) {
-		exampleFlatPosterior := toColumnMajor(posterior{
+		exampleFlatPosterior := toRowMajor(posterior{
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}},
 			posteriorValues: []float64{1, 2, 3},
 		})
@@ -88,7 +88,7 @@ func TestBasicUseCase(t *testing.T) {
 	})
 
 	t.Run("should allow to register boundaries, posterior (batch_size=2) and make samples", func(t *testing.T) {
-		exampleFlatPosterior := toColumnMajor(posterior{
+		exampleFlatPosterior := toRowMajor(posterior{
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}, {0.1, 0.1, 0.1}},
 			posteriorValues: []float64{1, 2, 3, 4},
 		})
@@ -111,7 +111,7 @@ func TestBasicUseCase(t *testing.T) {
 	})
 
 	t.Run("should allow to register boundaries, posterior (batch_size=3) and make samples", func(t *testing.T) {
-		exampleFlatPosterior := toColumnMajor(posterior{
+		exampleFlatPosterior := toRowMajor(posterior{
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}},
 			posteriorValues: []float64{1, 2, 3},
 		})
@@ -151,7 +151,7 @@ func TestParallelAddPosterior(t *testing.T) {
 func TestUUIDAreUnique(t *testing.T) {
 	dimension := 3
 	exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}}
-	exampleFlatPosterior := toColumnMajor(posterior{coordinates: [][]float64{{0.5, 0.5, 0.5}}, posteriorValues: []float64{1}})
+	exampleFlatPosterior := toRowMajor(posterior{coordinates: [][]float64{{0.5, 0.5, 0.5}}, posteriorValues: []float64{1}})
 
 	t.Run("two calls to AddBoundaries should return different uuids", func(t *testing.T) {
 		u1, _ := sendBoundaries(exampleBoundaries)
@@ -173,10 +173,10 @@ func TestUUIDAreUnique(t *testing.T) {
 
 // Basic failure cases should be gracefully handled and trigger nice errors from the server.
 func TestFailureCases(t *testing.T) {
-	t.Run("posterior should be expected in column-major order", func(t *testing.T) {
+	t.Run("posterior should be expected in row-major order", func(t *testing.T) {
 		dimension := 3
 		exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}}
-		exampleFlatPosterior := toRowMajor(
+		exampleFlatPosterior := toColumnMajor(
 			posterior{
 				coordinates: [][]float64{
 					{0.5, 0.5, 2.5},
