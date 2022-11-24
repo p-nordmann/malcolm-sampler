@@ -64,6 +64,8 @@ func TestBasicUseCase(t *testing.T) {
 	dimension := 3
 	exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}}
 
+	// TODO: factor test cases.
+
 	t.Run("should allow to register boundaries, posterior (batch_size=1) and make samples", func(t *testing.T) {
 		exampleFlatPosterior := toRowMajor(posterior{
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}},
@@ -92,7 +94,6 @@ func TestBasicUseCase(t *testing.T) {
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}, {0.1, 0.1, 0.1}},
 			posteriorValues: []float64{1, 2, 3, 4},
 		})
-
 		boundariesUUID, _ := sendBoundaries(exampleBoundaries)
 		posteriorUUID, _ := sendPosterior(exampleFlatPosterior, dimension, 2, boundariesUUID)
 		stream := makeMockSamplesStream(dimension)
@@ -115,7 +116,6 @@ func TestBasicUseCase(t *testing.T) {
 			coordinates:     [][]float64{{0.1, 0.1, 0.9}, {0.9, 0.1, 0.1}, {0.1, 0.1, 0.9}},
 			posteriorValues: []float64{1, 2, 3},
 		})
-
 		boundariesUUID, _ := sendBoundaries(exampleBoundaries)
 		posteriorUUID, _ := sendPosterior(exampleFlatPosterior, dimension, 3, boundariesUUID)
 		stream := makeMockSamplesStream(dimension)
@@ -127,21 +127,20 @@ func TestBasicUseCase(t *testing.T) {
 			},
 			stream,
 		)
-
 		if len(stream.samples) != 10 {
 			t.Errorf("expected 10 samples, got %d", len(stream.samples))
 		}
 	})
 
 	t.Run("should allow to handle parallel calls to makeSamples", func(t *testing.T) {
-
+		// TODO
 	})
 }
 
 // The service should be able to handle parallel calls to AddPosterior.
 func TestParallelAddPosterior(t *testing.T) {
 	t.Run("should allow to register several posteriors in parallel", func(t *testing.T) {
-
+		// TODO
 	})
 }
 
@@ -174,8 +173,7 @@ func TestUUIDAreUnique(t *testing.T) {
 // Basic failure cases should be gracefully handled and trigger nice errors from the server.
 func TestFailureCases(t *testing.T) {
 	t.Run("posterior should be expected in row-major order", func(t *testing.T) {
-		dimension := 3
-		exampleBoundaries := m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}}
+		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}})
 		exampleFlatPosterior := toColumnMajor(
 			posterior{
 				coordinates: [][]float64{
@@ -187,22 +185,32 @@ func TestFailureCases(t *testing.T) {
 				posteriorValues: []float64{1, 2, 3, 4},
 			},
 		)
-		boundariesUUID, _ := sendBoundaries(exampleBoundaries)
-		_, err := sendPosterior(exampleFlatPosterior, dimension, 4, boundariesUUID)
+		_, err := sendPosterior(exampleFlatPosterior, 3, 4, boundariesUUID)
 		if err == nil {
 			t.Error("Expected error out of bounds but got <nil>.")
 		}
 	})
 	t.Run("should fail when providing wrong UUID to AddPosterior", func(t *testing.T) {
-
+		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		exampleFlatPosterior := toRowMajor(posterior{coordinates: [][]float64{{0.5, 0.5, 0.5}}, posteriorValues: []float64{1}})
+		_, err := sendPosterior(exampleFlatPosterior, 3, 1, boundariesUUID+"-wrong-uuid")
+		if err == nil {
+			t.Error("expected error 'invalid UUID' but got <nil>")
+		}
 	})
 	t.Run("should fail when providing wrong UUID to MakeSamples", func(t *testing.T) {
+		// TODO
 
 	})
 	t.Run("should fail when providing posterior coordinate out of bounds", func(t *testing.T) {
-
+		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		outOfBoundsFlatPosterior := toRowMajor(posterior{coordinates: [][]float64{{0.5, 1.5, 0.5}}, posteriorValues: []float64{1}})
+		_, err := sendPosterior(outOfBoundsFlatPosterior, 3, 1, boundariesUUID)
+		if err == nil {
+			t.Error("expected error 'out-of-bounds' but got <nil>")
+		}
 	})
 	t.Run("should fail when providing posterior coordinates of incorrect dimension", func(t *testing.T) {
-
+		// TODO: improve control over sendPosterior to be able to send posterior of incorrect dimension
 	})
 }
