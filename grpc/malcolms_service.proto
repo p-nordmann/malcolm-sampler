@@ -17,8 +17,6 @@ service MalcolmSampler {
     // It finishes when the stream is closed and an identification token is returned.
     //
     // This rpc expects samples in batches.
-    //
-    // Whether it accepts a fraction of a point in a batch is implementation-specific.
     rpc AddPosterior(stream PosteriorValuesBatch) returns (PosteriorUUID) {}
 
     // MakeSamples samples the requested number of points.
