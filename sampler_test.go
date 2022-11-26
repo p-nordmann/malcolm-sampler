@@ -8,6 +8,7 @@ import (
 )
 
 // TODO(p-nordmann): small refactor to handle posterior normalization nicely.
+// TODO(p-nordmann): test for data-races.
 
 // Tests that the API behaves correctly with edgy inputs.
 //
