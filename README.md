@@ -4,6 +4,17 @@ Custom Gibbs sampler implementation for performing bayesian inference.
 ## State of README
 The present readme file is not finished. Other paragraphs will be added later.
 
+## Testing
+
+This project comes with tests, both for the Go API and the CLI. In order to run all tests, use the following:
+
+```
+go test ./...
+go test -race ./...
+```
+
+Last command is used to detect data races (important for thread-safety).
+
 ## References
 
 1. Sambridge, M. (1999). Geophysical inversion with a neighbourhood algorithm -
