@@ -5,7 +5,7 @@ import (
 )
 
 // FromSamples runs preprocessing on samples and posterior values and returns a structure that
-// implements TruePosterior interface.
+// implements `SamplerFactory` interface.
 //
 // Dimensions are expected to be consistent between all parameters.
 func FromSamples(
@@ -64,7 +64,6 @@ func FromSamples(
 	}, nil
 }
 
-// TODO(p-nordmann): thread-safety.
 type voronoiBox struct {
 	boundaries     Boundaries
 	sampleCount    int

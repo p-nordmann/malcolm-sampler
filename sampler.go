@@ -21,9 +21,12 @@ type SamplerFactory interface {
 	NewSampler(origin []float64) (Sampler, error)
 }
 
-// Sampler is a thread-safe generator of samples.
+// Sampler is a generator of samples.
 //
 // It refers to its parent factory to get the data it needs for sampling.
+//
+// Sampler is not thread-safe and should not be accessed from multiple goroutines.
+// Use multiple samplers from the same factory instead.
 type Sampler interface {
 	// Sample walks and returns a new sample.
 	Sample() []float64
