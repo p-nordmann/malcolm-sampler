@@ -12,6 +12,7 @@ import (
 )
 
 var port int
+var batchSize int
 
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
@@ -28,6 +29,12 @@ Example:
 malcolms serve --port 1234`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+
+		if batchSize < 1 {
+			log.Fatalf("batch_size must be positive")
+		}
+		log.Printf("batch_size=%d", batchSize)
+
 		log.Printf("listening on port %d...", port)
 		listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 		if err != nil {
@@ -39,7 +46,7 @@ malcolms serve --port 1234`,
 
 		pb.RegisterMalcolmSamplerServer(
 			grpcServer,
-			NewServer(),
+			NewServer(batchSize),
 		)
 		grpcServer.Serve(listener)
 	},
@@ -48,4 +55,5 @@ malcolms serve --port 1234`,
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().IntVarP(&port, "port", "p", 7352, "Port to listen to")
+	serveCmd.Flags().IntVarP(&batchSize, "batch-size", "b", 1, "Size of batches returned by MakeSamples")
 }

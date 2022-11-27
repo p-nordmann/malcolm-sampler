@@ -45,18 +45,21 @@ func (s *store) getF(uuid string) (ma.SamplerFactory, bool) {
 	return f, ok
 }
 
+// TODO: test sampling in batches.
 type samplingServer struct {
 	pb.UnimplementedMalcolmSamplerServer
 
-	state store
+	batchSize int
+	state     store
 }
 
-func NewServer() *samplingServer {
+func NewServer(batchSize int) *samplingServer {
 	return &samplingServer{
 		state: store{
 			boundaries: make(map[string]ma.Boundaries),
 			factories:  make(map[string]ma.SamplerFactory),
 		},
+		batchSize: batchSize,
 	}
 }
 
@@ -175,8 +178,12 @@ func (s *samplingServer) MakeSamples(msg *pb.MakeSamplesRequest, sampleStream pb
 			return status.Error(codes.Internal, "error building sampler")
 		}
 
-		for k := 0; k < amount; k++ {
-			sampleStream.Send(&pb.SamplesBatch{Coordinates: sampler.Sample()})
+		for k, count := 0, 0; k < amount; k += count {
+			var coordinates []float64
+			for count = 0; count < batchSize && k+count < amount; count++ {
+				coordinates = append(coordinates, sampler.Sample()...)
+			}
+			sampleStream.Send(&pb.SamplesBatch{Coordinates: coordinates})
 		}
 
 		return nil

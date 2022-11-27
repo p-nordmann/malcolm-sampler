@@ -134,7 +134,9 @@ func toColumnMajor(p posterior) flatPosterior {
 }
 
 // server will be used by the tests.
-var server = malcolms.NewServer()
+// we use a batch size of 1 for the tests
+// TODO: add tests for bigger batches.
+var server = malcolms.NewServer(1)
 
 // sendBoundaries builds a grpc message and calls AddBoundaries.
 //
