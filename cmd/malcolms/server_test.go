@@ -11,6 +11,8 @@ import (
 	malcolms "github.com/p-nordmann/malcolm-sampler/cmd/malcolms"
 	mgrpc "github.com/p-nordmann/malcolm-sampler/grpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // mockAddPosteriorStream provides mocking for request's stream for AddPosterior.
@@ -277,11 +279,18 @@ func TestBasicUseCase(t *testing.T) {
 				k,
 			),
 			func(t *testing.T) {
-				boundariesUUID, _ := sendBoundaries(tc.boundaries)
-				posteriorUUID, _ := sendPosterior(tc.posterior, tc.batchSizes, boundariesUUID)
+				boundariesUUID, err := sendBoundaries(tc.boundaries)
+				if status.Code(err) != codes.OK {
+					t.Errorf("expected OK but got %s", status.Code(err))
+				}
+
+				posteriorUUID, err := sendPosterior(tc.posterior, tc.batchSizes, boundariesUUID)
+				if status.Code(err) != codes.OK {
+					t.Errorf("expected OK but got %s", status.Code(err))
+				}
 
 				stream := makeMockSamplesStream(tc.dimension)
-				server.MakeSamples(
+				err = server.MakeSamples(
 					&mgrpc.MakeSamplesRequest{
 						Uuid:   &mgrpc.PosteriorUUID{Value: posteriorUUID},
 						Origin: tc.origin,
@@ -289,6 +298,9 @@ func TestBasicUseCase(t *testing.T) {
 					},
 					stream,
 				)
+				if status.Code(err) != codes.OK {
+					t.Errorf("expected OK but got %s", status.Code(err))
+				}
 
 				if len(stream.samples) != tc.amount {
 					t.Errorf("expected %d samples, got %d", tc.amount, len(stream.samples))
@@ -344,8 +356,12 @@ func TestParallelCalls(t *testing.T) {
 		}()
 		wg.Wait()
 
-		if err1 != nil || err2 != nil {
-			t.Errorf("expected successful calls to AddPosterior but got errors %v, %v", err1, err2)
+		if status.Code(err1) != codes.OK || status.Code(err2) != codes.OK {
+			t.Errorf(
+				"expected successful calls to AddPosterior but got errors %s, %s",
+				status.Code(err1),
+				status.Code(err2),
+			)
 		}
 		if u1 == u2 {
 			t.Errorf("both UUIDs were equal ('%s')", u1)
@@ -393,8 +409,12 @@ func TestParallelCalls(t *testing.T) {
 			<-s2.samples
 		}
 		wg.Wait()
-		if err1 != nil || err2 != nil {
-			t.Errorf("expected successful calls to MakeSamples but got errors %v, %v", err1, err2)
+		if status.Code(err1) != codes.OK || status.Code(err2) != codes.OK {
+			t.Errorf(
+				"expected successful calls to MakeSamples but got errors %s, %s",
+				status.Code(err1),
+				status.Code(err2),
+			)
 		}
 	})
 }
@@ -407,27 +427,51 @@ func TestUUIDAreUnique(t *testing.T) {
 	exampleFlatPosterior := flatPosterior{coordinates: []float64{0.5, 0.5, 0.5}, posteriorValues: []float64{1}}
 
 	t.Run("two calls to AddBoundaries should return different uuids", func(t *testing.T) {
-		u1, _ := sendBoundaries(exampleBoundaries)
-		u2, _ := sendBoundaries(exampleBoundaries)
+		u1, err := sendBoundaries(exampleBoundaries)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
+		u2, err := sendBoundaries(exampleBoundaries)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		if u1 == u2 {
 			t.Errorf("both UUIDs were equal ('%s')", u1)
 		}
 	})
 
 	t.Run("two calls to AddPosterior should return different uuids", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(exampleBoundaries)
-		u1, _ := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
-		u2, _ := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		boundariesUUID, err := sendBoundaries(exampleBoundaries)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
+		u1, err := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
+		u2, err := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		if u1 == u2 {
 			t.Errorf("both UUIDs were equal ('%s')", u1)
 		}
 	})
 }
 
-// Basic failure cases should be gracefully handled and trigger nice errors from the server.
+// Business failure cases should be gracefully handled and trigger nice errors from the server.
 func TestFailureCases(t *testing.T) {
 	t.Run("posterior should be expected in row-major order", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}})
+		boundariesUUID, err := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 3}})
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		exampleFlatPosterior := toColumnMajor(
 			posterior{
 				coordinates: [][]float64{
@@ -439,26 +483,45 @@ func TestFailureCases(t *testing.T) {
 				posteriorValues: []float64{1, 2, 3, 4},
 			},
 		)
-		_, err := sendPosterior(exampleFlatPosterior, [][2]int{{12, 4}}, boundariesUUID)
-		if err == nil {
-			t.Error("Expected error out of bounds but got <nil>.")
+		_, err = sendPosterior(exampleFlatPosterior, [][2]int{{12, 4}}, boundariesUUID)
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf(
+				"Expected 'FailedPrecondition: out of bounds' but got '%s: %s'.",
+				status.Code(err), err.Error(),
+			)
 		}
 	})
+
 	t.Run("should fail when providing wrong UUID to AddPosterior", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		boundariesUUID, err := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		exampleFlatPosterior := flatPosterior{coordinates: []float64{0.5, 0.5, 0.5}, posteriorValues: []float64{1}}
-		_, err := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID+"-wrong-uuid")
-		if err == nil {
-			t.Error("expected error 'invalid UUID' but got <nil>")
+		_, err = sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID+"-wrong-uuid")
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf(
+				"Expected 'FailedPrecondition: invalid UUID' but got '%s: %s'.",
+				status.Code(err), err.Error(),
+			)
 		}
 	})
+
 	t.Run("should fail when providing wrong UUID to MakeSamples", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		boundariesUUID, err := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		exampleFlatPosterior := flatPosterior{coordinates: []float64{0.5, 0.5, 0.5}, posteriorValues: []float64{1}}
-		posteriorUUID, _ := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		posteriorUUID, err := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
 
 		stream := makeMockSamplesStream(3)
-		err := server.MakeSamples(
+		err = server.MakeSamples(
 			&mgrpc.MakeSamplesRequest{
 				Uuid:   &mgrpc.PosteriorUUID{Value: posteriorUUID + "-wrong-uuid"},
 				Origin: []float64{0.5, 0.5, 0.5},
@@ -467,24 +530,43 @@ func TestFailureCases(t *testing.T) {
 			stream,
 		)
 
-		if err == nil {
-			t.Error("expected error 'invalid UUID' but got <nil>")
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf(
+				"Expected 'FailedPrecondition: invalid UUID' but got '%s: %s'.",
+				status.Code(err), err.Error(),
+			)
 		}
 	})
+
 	t.Run("should fail when providing posterior coordinate out of bounds", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		boundariesUUID, err := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		outOfBoundsFlatPosterior := flatPosterior{coordinates: []float64{0.5, 1.5, 0.5}, posteriorValues: []float64{1}}
-		_, err := sendPosterior(outOfBoundsFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
-		if err == nil {
-			t.Error("expected error 'out-of-bounds' but got <nil>")
+		_, err = sendPosterior(outOfBoundsFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf(
+				"Expected 'FailedPrecondition: out of bounds' but got '%s: %s'.",
+				status.Code(err), err.Error(),
+			)
 		}
 	})
+
 	t.Run("should fail when providing posterior coordinates of incorrect dimension", func(t *testing.T) {
-		boundariesUUID, _ := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		boundariesUUID, err := sendBoundaries(m.Boundaries{Infima: []float64{0, 0, 0}, Suprema: []float64{1, 1, 1}})
+		if status.Code(err) != codes.OK {
+			t.Errorf("expected OK but got %s", status.Code(err))
+		}
+
 		exampleFlatPosterior := flatPosterior{coordinates: []float64{0.5, 0.5, 0.5, 1, 1, 1, 1}, posteriorValues: []float64{1, 2}}
-		_, err := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}, {4, 1}}, boundariesUUID)
-		if err == nil {
-			t.Error("expected error 'invalid dimension' but got <nil>")
+		_, err = sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}, {4, 1}}, boundariesUUID)
+		if status.Code(err) != codes.FailedPrecondition {
+			t.Errorf(
+				"Expected 'FailedPrecondition: invalid dimension' but got '%s: %s'.",
+				status.Code(err), err.Error(),
+			)
 		}
 	})
 }
