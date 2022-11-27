@@ -5,19 +5,46 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
-	"github.com/google/uuid"
+	UUID "github.com/google/uuid"
 
 	ma "github.com/p-nordmann/malcolm-sampler"
 	pb "github.com/p-nordmann/malcolm-sampler/grpc"
 )
 
 // TODO(p-nordmann): do not embed internal errors in grpc responses.
-// TODO(p-nordmann): thread safety.
 
 type store struct {
 	boundaries map[string]ma.Boundaries
 	factories  map[string]ma.SamplerFactory
+	lock       sync.Mutex
+}
+
+func (s *store) setB(uuid string, b ma.Boundaries) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.boundaries[uuid] = b
+}
+
+func (s *store) setF(uuid string, f ma.SamplerFactory) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.factories[uuid] = f
+}
+
+func (s *store) getB(uuid string) (ma.Boundaries, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	b, ok := s.boundaries[uuid]
+	return b, ok
+}
+
+func (s *store) getF(uuid string) (ma.SamplerFactory, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	f, ok := s.factories[uuid]
+	return f, ok
 }
 
 type samplingServer struct {
@@ -50,17 +77,17 @@ func (s *samplingServer) AddBoundaries(ctx context.Context, boundariesMessage *p
 		}
 	}
 	// Build and store boundaries.
-	UUID := uuid.New().String()
-	s.state.boundaries[UUID] = ma.Boundaries{
+	uuid := UUID.New().String()
+	s.state.setB(uuid, ma.Boundaries{
 		Infima:  boundariesMessage.Infima,
 		Suprema: boundariesMessage.Suprema,
-	}
-	return &pb.BoundariesUUID{Value: UUID}, nil
+	})
+	return &pb.BoundariesUUID{Value: uuid}, nil
 }
 
 func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosteriorServer) error {
 
-	var UUID string
+	var uuid string
 	var boundaries ma.Boundaries
 	var samples [][]float64
 	var posteriorValues []float64
@@ -71,43 +98,43 @@ func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosterio
 
 		// When stream terminates, finish building factory.
 		if err == io.EOF {
-			if len(UUID) == 0 {
+			if len(uuid) == 0 {
 				return errors.New("empty query")
 			}
 			if len(samples) == 0 {
 				return errors.New("no data provided")
 			}
-			factoryUUID := uuid.New().String()
+			factoryUuid := UUID.New().String()
 			factory, err := ma.FromSamples(boundaries, samples, posteriorValues)
 			if err != nil {
 				return fmt.Errorf("error creating factory: %w", err)
 			}
-			s.state.factories[factoryUUID] = factory
-			return sampleStream.SendAndClose(&pb.PosteriorUUID{Value: factoryUUID})
+			s.state.setF(factoryUuid, factory)
+			return sampleStream.SendAndClose(&pb.PosteriorUUID{Value: factoryUuid})
 		}
 
 		// Process error cases.
 		if err != nil {
 			return fmt.Errorf("error receiving true samples: %w", err)
 		}
-		msgUUID := msg.GetUuid().GetValue()
-		if len(msgUUID) == 0 {
+		msgUuid := msg.GetUuid().GetValue()
+		if len(msgUuid) == 0 {
 			return errors.New("empty UUID is not allowed")
 		}
 
 		// First message defines what boundaries to work with.
-		if len(UUID) == 0 {
+		if len(uuid) == 0 {
 			var ok bool
-			UUID = msgUUID
-			if boundaries, ok = s.state.boundaries[UUID]; !ok {
+			uuid = msgUuid
+			if boundaries, ok = s.state.getB(uuid); !ok {
 				return errors.New("invalid UUID: no corresponding boundaries")
 			}
 		}
 
 		// Validate UUID and samples dimensions.
 		dimension := len(boundaries.Infima)
-		if UUID != msgUUID {
-			return fmt.Errorf("inconsistent UUID: expected %s but received %s", UUID, msgUUID)
+		if uuid != msgUuid {
+			return fmt.Errorf("inconsistent UUID: expected %s but received %s", uuid, msgUuid)
 		}
 		coordinates := msg.GetCoordinates()
 		posterior := msg.GetPosteriorValues()
@@ -137,17 +164,17 @@ func (s *samplingServer) AddPosterior(sampleStream pb.MalcolmSampler_AddPosterio
 }
 
 func (s *samplingServer) MakeSamples(msg *pb.MakeSamplesRequest, sampleStream pb.MalcolmSampler_MakeSamplesServer) error {
-	UUID := msg.GetUuid().GetValue()
-	numberOfSamples := int(msg.GetAmount())
-	if numberOfSamples <= 0 {
-		return errors.New("number_of_samples must be positive")
+	uuid := msg.GetUuid().GetValue()
+	amount := int(msg.GetAmount())
+	if amount <= 0 {
+		return errors.New("amount must be positive")
 	}
-	if factory, ok := s.state.factories[UUID]; ok {
+	if factory, ok := s.state.getF(uuid); ok {
 		sampler, err := factory.NewSampler(msg.GetOrigin())
 		if err != nil {
 			return fmt.Errorf("error building sampler: %w", err)
 		}
-		for k := 0; k < numberOfSamples; k++ {
+		for k := 0; k < amount; k++ {
 			sampleStream.Send(&pb.SamplesBatch{Coordinates: sampler.Sample()})
 		}
 		return nil
