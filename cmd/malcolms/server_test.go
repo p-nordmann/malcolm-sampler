@@ -357,11 +357,13 @@ func TestParallelCalls(t *testing.T) {
 		exampleFlatPosterior := flatPosterior{coordinates: []float64{0.5, 0.5, 0.5}, posteriorValues: []float64{1}}
 		posteriorUUID, _ := sendPosterior(exampleFlatPosterior, [][2]int{{3, 1}}, boundariesUUID)
 
+		var wg sync.WaitGroup
+		wg.Add(2)
 		var err1, err2 error
 
 		s1 := makeMockSamplesStreamChan(3)
 		go func() {
-			err2 = server.MakeSamples(
+			err1 = server.MakeSamples(
 				&mgrpc.MakeSamplesRequest{
 					Uuid:   &mgrpc.PosteriorUUID{Value: posteriorUUID},
 					Origin: []float64{0.9, 0.9, 0.9},
@@ -369,6 +371,7 @@ func TestParallelCalls(t *testing.T) {
 				},
 				s1,
 			)
+			wg.Done()
 		}()
 
 		s2 := makeMockSamplesStreamChan(3)
@@ -381,6 +384,7 @@ func TestParallelCalls(t *testing.T) {
 				},
 				s2,
 			)
+			wg.Done()
 		}()
 
 		// Receive samples.
@@ -388,7 +392,7 @@ func TestParallelCalls(t *testing.T) {
 			<-s1.samples
 			<-s2.samples
 		}
-
+		wg.Wait()
 		if err1 != nil || err2 != nil {
 			t.Errorf("expected successful calls to MakeSamples but got errors %v, %v", err1, err2)
 		}
