@@ -43,8 +43,7 @@ func FromSamples(
 		return nil, errors.New("`samples` and `posteriorValues` must have the same length")
 	}
 
-	// Run preprocessing.
-	// Sort along each axis.
+	// Run preprocessing: transpose and sort along each axis.
 	data := transpose(samples)
 	sortingIndices := make([][]int, dimension)
 	for i := 0; i < dimension; i++ {
@@ -121,7 +120,7 @@ type voronoiSampler struct {
 	// Is initialized with origin point and is updated during the walk.
 	position []float64
 
-	// Holds the squares of distances to the current axis to walk along.
+	// Holds the squared distances to the current axis to walk along.
 	// It is passed as ordinates to the parabolas views for computing the minima.
 	//
 	// We keep them stored to avoid computing distances along each dimension each time we change direction.
